@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<title>Krypto ohne sichtbaren Key</title>
+<style>
+  body { font-family: sans-serif; max-width: 600px; margin: 40px auto; }
+  textarea, input { width: 100%; padding: 8px; margin: 8px 0; font-family: monospace; }
+  button { padding: 8px 14px; margin-right: 8px; }
+</style>
+</head>
+<body>
+
+<h2>Starke Verschlüsselung (AES‑256)</h2>
+
+<label>Passwort (wird NICHT gespeichert):</label>
+<input id="pw" type="password" placeholder="Passwort eingeben…">
+
+<label>Eingabe (Klartext oder Cipher):</label>
+<textarea id="input" rows="4"></textarea>
+
+<button onclick="encrypt()">Verschlüsseln</button>
+<button onclick="decrypt()">Entschlüsseln</button>
+
+<label>Ausgabe:</label>
+<textarea id="output" rows="4" readonly></textarea>
+
+<script>
+// Text <-> Bytes
+const enc = new TextEncoder();
+const dec = new TextDecoder();
+
+// Base64 Hilfsfunktionen
+function toBase64(buf) {
+  return btoa(String.fromCharCode(...new Uint8Array(buf)));
+}
+function fromBase64(b64) {
+  return Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+}
+
+// Key aus Passwort ableiten (PBKDF2)
+async function deriveKey(password) {
+  const salt = enc.encode("konstante_salt_fuer_determinismus");
+  const baseKey = await crypto.subtle.importKey(
+    "raw", enc.encode(password), "PBKDF2", false, ["deriveKey"]
+  );
+  return crypto.subtle.deriveKey(
+    { name: "PBKDF2", salt, iterations: 200000, hash: "SHA-256" },
+    baseKey,
+    { name: "AES-GCM", length: 256 },
+    false,
+    ["encrypt", "decrypt"]
+  );
+}
+
+// Verschlüsseln
+async function encrypt() {
+  const pw = document.getElementById("pw").value;
+  if (!pw) return alert("Bitte Passwort eingeben!");
+
+  const key = await deriveKey(pw);
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const data = enc.encode(document.getElementById("input").value);
+
+  const cipher = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, data);
+
+  // IV + Cipher zusammenfügen
+  const combined = new Uint8Array(iv.length + cipher.byteLength);
+  combined.set(iv, 0);
+  combined.set(new Uint8Array(cipher), iv.length);
+
+  document.getElementById("output").value = toBase64(combined);
+}
+
+// Entschlüsseln
+async function decrypt() {
+  const pw = document.getElementById("pw").value;
+  if (!pw) return alert("Bitte Passwort eingeben!");
+
+  const key = await deriveKey(pw);
+  const raw = fromBase64(document.getElementById("input").value);
+
+  const iv = raw.slice(0, 12);
+  const cipher = raw.slice(12);
+
+  try {
+    const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, cipher);
+    document.getElementById("output").value = dec.decode(plain);
+  } catch (e) {
+    document.getElementById("output").value = "❌ Entschlüsselung fehlgeschlagen (falsches Passwort?)";
+  }
+}
+</script>
+
+</body>
+</html>
