@@ -11,7 +11,7 @@
 </head>
 <body>
 
-<h2>Starke Verschlüsselung (AES‑256)</h2>
+<h2>AES-256 Verschlüsselung</h2>
 
 <label>Passwort (wird nicht gespeichert):</label>
 <input id="pw" type="password" placeholder="Passwort eingeben…">
@@ -87,7 +87,7 @@ async function decrypt() {
     const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, cipher);
     document.getElementById("output").value = dec.decode(plain);
   } catch (e) {
-    document.getElementById("output").value = "❌ Entschlüsselung fehlgeschlagen (falsches Passwort?)";
+    document.getElementById("output").value = "Entschlüsselung fehlgeschlagen (falsches Passwort?)";
   }
 }
 </script>
